@@ -26,6 +26,7 @@ jobs:
       POSTGRES_DB: olist
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
+      REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

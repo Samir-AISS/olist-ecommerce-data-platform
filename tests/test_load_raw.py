@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from ingestion.config import SAMPLE_DATA_DIR, SOURCE_FILES
+from ingestion.config import SAMPLE_DATA_DIR, SOURCE_FILES, DatabaseSettings
 from ingestion.load_raw import check_source_files, read_header
 
 
@@ -42,3 +42,8 @@ def test_check_source_files_lists_every_missing_file(tmp_path: Path) -> None:
 
 def test_sample_contains_every_source_file() -> None:
     assert len(check_source_files(SAMPLE_DATA_DIR)) == len(SOURCE_FILES)
+
+
+def test_conninfo_quotes_special_characters_in_password() -> None:
+    settings = DatabaseSettings("localhost", 5432, "olist", "p@ss word'with quote", "olist")
+    assert "password='p@ss word\\'with quote'" in settings.conninfo()

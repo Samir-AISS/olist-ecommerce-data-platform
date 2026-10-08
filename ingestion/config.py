@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
+from psycopg.conninfo import make_conninfo
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
@@ -56,7 +57,11 @@ class DatabaseSettings:
         )
 
     def conninfo(self) -> str:
-        return (
-            f"host={self.host} port={self.port} user={self.user} "
-            f"password={self.password} dbname={self.dbname}"
+        # make_conninfo quotes values, so passwords with spaces or quotes work.
+        return make_conninfo(
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=self.password,
+            dbname=self.dbname,
         )

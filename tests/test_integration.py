@@ -1,6 +1,7 @@
 """Load the sample into a throwaway schema and check row counts and idempotency."""
 
 import csv
+import os
 from collections.abc import Iterator
 
 import psycopg
@@ -19,6 +20,8 @@ def conn() -> Iterator[psycopg.Connection]:
     try:
         connection = psycopg.connect(DatabaseSettings.from_env().conninfo(), connect_timeout=3)
     except (psycopg.OperationalError, RuntimeError) as exc:
+        if os.getenv("REQUIRE_DB") == "1":  # set in CI: never skip silently there
+            raise
         pytest.skip(f"PostgreSQL not reachable ({exc}); run `make up`")
     with connection:
         yield connection
