@@ -31,3 +31,24 @@ Short records of the technical choices made in this project: context, decision, 
 - **Decision:** revenue = sum of item `price` for orders with status `delivered`, freight excluded. Defined once in `fct_order_items` and documented in `docs/kpi_dictionary.md`.
 - **Alternatives:** sum of `payment_value` — rejected: mixes freight and payment terms with sales.
 - **Consequences:** a business-rule test checks that no cancelled order contributes to revenue.
+
+## ADR-005 · Raw layer: all TEXT, loaded with COPY in one transaction
+
+- **Context:** the raw layer must be a faithful copy of the source. Review comments contain line breaks, and one file starts with a UTF-8 BOM.
+- **Decision:** every raw column is `TEXT`; files are streamed with PostgreSQL `COPY ... (FORMAT csv)`; all tables are truncated and reloaded in a single transaction; each load is logged in `raw._load_audit` with its row count and SHA-256.
+- **Alternatives:** `pandas.to_sql` — rejected: slower, infers types silently (zip codes lose leading zeros), and the old pipeline needed workarounds for it.
+- **Consequences:** typing and cleaning happen in dbt staging, where they are tested. A failed load leaves the previous data untouched. Tables are truncated, not dropped, so dbt views built on them survive reloads.
+
+## ADR-006 · Airflow deferred until there is something to orchestrate
+
+- **Context:** the brief includes a daily Airflow DAG. In phase 1 the pipeline is a single load step.
+- **Decision:** start with PostgreSQL only in Docker Compose; add Airflow once dbt models exist.
+- **Alternatives:** ship the full Airflow stack from day one — rejected: heavier setup for no benefit yet.
+- **Consequences:** `make up` starts in seconds and uses little memory.
+
+## ADR-007 · A committed 500-order sample for CI
+
+- **Context:** CI must run the real pipeline, not just check that files exist, but it cannot depend on a Kaggle download.
+- **Decision:** `scripts/make_sample.py` picks 500 orders deterministically and keeps every related row (items, payments, reviews, customers, products, sellers, geolocation). The 500 KB sample is committed in `data/sample/` (dataset license CC BY-NC-SA 4.0, attributed in the README).
+- **Alternatives:** download the full dataset in CI — rejected: slow and needs network access to Kaggle; random sampling — rejected: not reproducible and breaks foreign keys.
+- **Consequences:** CI loads a referentially consistent dataset in seconds; a test guards that consistency.

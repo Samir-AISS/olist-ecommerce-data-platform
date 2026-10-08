@@ -4,6 +4,7 @@
 Raw CSVs in, tested star schema and business answers out — every KPI defined once, tested, and documented.
 
 ![Status](https://img.shields.io/badge/status-work%20in%20progress-orange)
+[![CI](https://github.com/Samir-AISS/olist-ecommerce-data-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Samir-AISS/olist-ecommerce-data-platform/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![dbt](https://img.shields.io/badge/dbt-Core-FF694B?logo=dbt&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Docker-4169E1?logo=postgresql&logoColor=white)
@@ -104,7 +105,7 @@ flowchart LR
 
 | Layer | Responsibility | Materialization |
 |---|---|---|
-| **raw** | Exact copy of the CSV files, loaded by Python. Never edited by hand. | tables |
+| **raw** | Exact copy of the CSV files: every column is `TEXT`, streamed with `COPY` in one transaction, each load audited in `raw._load_audit`. | tables |
 | **staging** (`stg_`) | One model per source table: cast types, rename to `snake_case`, trim and standardize values. No joins. | views |
 | **intermediate** (`int_`) | Joins and business rules: aggregate payments and reviews per order, compute delivery delays. | views |
 | **marts** (`fct_`, `dim_`) | Star schema consumed by BI and analyses. Explicit grain, fully tested. | tables · `fct_order_items` is **incremental** |
@@ -296,27 +297,45 @@ Tests run on every `dbt build`, locally and in CI. A failing test blocks the bui
 
 ## Quick start
 
-> [!IMPORTANT]
-> 🚧 These commands become available as the phases land (see [roadmap](#roadmap)).
-
-**Prerequisites:** Docker Desktop, [uv](https://docs.astral.sh/uv/), GNU Make, and a free [Kaggle](https://www.kaggle.com) account to download the dataset.
+**Prerequisites:** Docker Desktop, [uv](https://docs.astral.sh/uv/) and GNU Make. No Kaggle account needed: the public dataset is downloaded automatically.
 
 ```bash
 git clone https://github.com/Samir-AISS/olist-ecommerce-data-platform.git
 cd olist-ecommerce-data-platform
-cp .env.example .env    # local credentials, never committed
 
-make setup              # Python environment (uv) + pre-commit hooks
-make up                 # start PostgreSQL (and Airflow) in Docker
-make run                # load CSVs → dbt build (models + tests) → exports
-make docs               # browse the dbt documentation and lineage graph
+make setup              # Python env (uv) + pre-commit hooks + .env from .env.example
+make up                 # start PostgreSQL in Docker and wait until healthy
+make run                # download the 9 CSV files → load the raw schema
 ```
+
+`make run` currently stops after the raw layer; dbt models are added in phase 2 (see [roadmap](#roadmap)).
 
 | Command | What it does |
 |---|---|
-| `make test` | Python unit tests (`pytest`) |
-| `make lint` | `ruff` + `sqlfluff` checks |
-| `make down` | Stop all containers |
+| `make test` | Unit tests + integration tests against PostgreSQL (`pytest`) |
+| `make lint` / `make format` | `ruff` checks / fixes |
+| `make sample` | Rebuild the 500-order CI sample in `data/sample/` |
+| `make down` / `make reset-db` | Stop containers / also delete the database volume |
+| `make help` | List every command |
+
+### Raw layer after `make run`
+
+Row counts printed by `ingestion/load_raw.py` on the full dataset:
+
+| Table | Rows |
+|---|---:|
+| `raw.geolocation` | 1,000,163 |
+| `raw.order_items` | 112,650 |
+| `raw.order_payments` | 103,886 |
+| `raw.customers` | 99,441 |
+| `raw.orders` | 99,441 |
+| `raw.order_reviews` | 99,224 |
+| `raw.products` | 32,951 |
+| `raw.sellers` | 3,095 |
+| `raw.product_category_name_translation` | 71 |
+| **Total** | **1,550,922** |
+
+> `wc -l` reports 104,719 lines for the reviews file: some review comments span several lines. Loading with a real CSV parser (`COPY`) gives the correct 99,224 reviews.
 
 ---
 
@@ -330,7 +349,7 @@ make docs               # browse the dbt documentation and lineage graph
 | **Airflow** | Daily orchestration | Shows how the pipeline is scheduled and monitored in production |
 | **Tableau Public** | BI dashboard | Free, shareable public link |
 | **ruff · sqlfluff · pytest · pre-commit** | Code quality | Consistent style and safety net before every commit |
-| **GitHub Actions** | CI | Lint + `dbt build` on a data sample for every pull request |
+| **GitHub Actions** | CI | Lint, tests and a full load of a 500-order sample on every pull request |
 
 ---
 
@@ -348,6 +367,8 @@ olist-ecommerce-data-platform/
 ├── dags/                       # Airflow daily DAG
 ├── analyses/                   # advanced SQL: cohorts, window functions, findings
 ├── dashboard/                  # Tableau exports, screenshots, public link
+├── scripts/                    # make_sample.py: builds the CI sample
+├── data/sample/                # 500-order sample committed for CI
 ├── tests/                      # Python tests
 ├── docs/
 │   ├── decisions.md            # architecture decision records
@@ -362,7 +383,7 @@ olist-ecommerce-data-platform/
 
 | Phase | Scope | Verifiable deliverable | Status |
 |---|---|---|---|
-| 1 | Project skeleton: Docker, ingestion, tooling, CI | `make setup && make up && make run` loads the raw schema | ⬜ |
+| 1 | Project skeleton: Docker, ingestion, tooling, CI | `make setup && make up && make run` loads the raw schema | ✅ |
 | 2 | dbt sources + staging layer, naming conventions | `dbt build` green on staging | ⬜ |
 | 3 | Intermediate + star schema, incremental model, snapshot, tests | Documented star schema, grain test passing | ⬜ |
 | 4 | KPI dictionary + advanced SQL analyses | `docs/kpi_dictionary.md`, `analyses/` | ⬜ |
