@@ -1,0 +1,29 @@
+# Secrets — catches ".env", ".env.local" and even ".env " with a trailing space
+.env*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Data (downloaded at setup, never committed)
+data/raw/*
+!data/raw/.gitkeep
+data/exports/*
+!data/exports/.gitkeep
+
+# dbt
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml
+
+# Airflow
+airflow/logs/
+
+# OS / editors
+.DS_Store
+*.log
