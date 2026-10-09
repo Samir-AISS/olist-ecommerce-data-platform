@@ -16,5 +16,57 @@ services:
       timeout: 5s
       retries: 10
 
+  # Orchestration, started with `make airflow-up` (profile "airflow")
+  airflow-db:
+    image: postgres:16
+    container_name: olist_airflow_db
+    profiles: ["airflow"]
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow-local-only
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  airflow:
+    build:
+      context: .
+      dockerfile: docker/airflow/Dockerfile
+    container_name: olist_airflow
+    profiles: ["airflow"]
+    command: standalone
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-db:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow-local-only@airflow-db/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
+      # Local demo only: every visitor of localhost:8080 is admin, no login
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      # Pipeline settings, read by the DAG tasks
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DBT_PROJECT_DIR: /opt/project/dbt
+      DBT_PROFILES_DIR: /opt/project/dbt
+      DBT_TARGET_PATH: /tmp/dbt-target
+      DBT_LOG_PATH: /tmp/dbt-logs
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/opt/project
+
 volumes:
   postgres_data:
+  airflow_db_data:

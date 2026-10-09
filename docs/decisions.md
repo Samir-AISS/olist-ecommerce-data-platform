@@ -108,3 +108,10 @@ Short records of the technical choices made in this project: context, decision, 
 - **Decision:** `make export` writes the six star-schema tables to CSV with `COPY` (booleans as `true`/`false`); Tableau relates them on their keys, keeping each table's grain. A GitHub Actions workflow builds the warehouse on the sample and publishes `dbt docs` to GitHub Pages on every merge.
 - **Alternatives:** one wide denormalized export — rejected: order-level measures would be duplicated per item; Metabase or Superset — possible, but Tableau Public gives a shareable public link.
 - **Consequences:** the dashboard must be refreshed by re-exporting; the public docs show the sample's catalog statistics but the full lineage and every test.
+
+## ADR-016 · Airflow runs the pipeline from an isolated virtualenv
+
+- **Context:** Airflow pins hundreds of dependencies through its constraint files; dbt pins its own. Installing both in one environment often fails or silently downgrades packages.
+- **Decision:** the Airflow image (`docker/airflow/Dockerfile`) creates `/opt/pipeline-venv` from `requirements-pipeline.txt` (exported from `uv.lock`). Tasks are `BashOperator`s calling the same commands as the Makefile. One task per dbt layer (seed, staging, snapshot, intermediate, marts). Airflow is behind a Docker Compose profile, so `make up` stays light.
+- **Alternatives:** Astronomer Cosmos (one Airflow task per dbt model) — more granular but another dependency to learn and maintain for nine tasks; `KubernetesPodOperator` — overkill locally.
+- **Consequences:** CI installs Airflow with the official constraints and checks that the DAG imports and has its nine tasks. Paths are overridable (`OLIST_PROJECT_DIR`, `OLIST_PIPELINE_BIN`) so the DAG can be tested outside Docker.

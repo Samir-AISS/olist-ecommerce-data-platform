@@ -55,3 +55,29 @@ jobs:
           uv run python scripts/run_analyses.py --output "$RUNNER_TEMP/findings.md"
       - name: Export the marts for Tableau
         run: uv run python scripts/export_marts.py --output-dir "$RUNNER_TEMP/exports"
+
+  airflow-dag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AIRFLOW_HOME: /tmp/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install Airflow (same version as the Docker image)
+        run: |
+          uv venv --python 3.11 /tmp/airflow-venv
+          VIRTUAL_ENV=/tmp/airflow-venv uv pip install "apache-airflow==3.3.2" \
+            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.11.txt
+      - name: DAG loads without import errors and has its 9 tasks
+        run: |
+          airflow=/tmp/airflow-venv/bin/airflow
+          $airflow db migrate > /dev/null
+          errors=$($airflow dags list-import-errors -o json 2>/dev/null | tail -n 1)
+          echo "import errors: $errors"
+          test "$errors" = "[]"
+          tasks=$($airflow tasks list olist_daily 2>/dev/null | grep -c .)
+          echo "tasks: $tasks"
+          test "$tasks" -eq 9
