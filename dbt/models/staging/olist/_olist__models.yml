@@ -1,0 +1,200 @@
+version: 2
+
+models:
+  - name: stg_olist__orders
+    description: Orders with typed timestamps. One row per order.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "delivered_to_customer_at >= purchased_at"
+          config:
+            where: "delivered_to_customer_at is not null"
+      - dbt_utils.expression_is_true:
+          description: Known source anomaly (166 orders), tracked as a warning.
+          arguments:
+            expression: "delivered_to_carrier_at >= purchased_at"
+          config:
+            where: "delivered_to_carrier_at is not null"
+            severity: warn
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        description: Per-order customer key; map to customer_unique_id via stg_olist__customers.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_olist__customers')
+                field: customer_id
+      - name: order_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - created
+                  - approved
+                  - invoiced
+                  - processing
+                  - shipped
+                  - delivered
+                  - canceled
+                  - unavailable
+      - name: purchased_at
+        data_tests: [not_null]
+      - name: estimated_delivery_date
+        description: Delivery date promised to the customer at purchase.
+        data_tests: [not_null]
+
+  - name: stg_olist__order_items
+    description: Items of each order. One row per order_id + order_item_id.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, order_item_id]
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_olist__orders')
+                field: order_id
+      - name: order_item_id
+        description: Position of the item in the order (1, 2, 3…).
+        data_tests: [not_null]
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_olist__products')
+                field: product_id
+      - name: seller_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_olist__sellers')
+                field: seller_id
+      - name: price
+        description: Item price in BRL, excluding freight.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: freight_value
+        description: Freight charged for this item, in BRL.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+  - name: stg_olist__order_payments
+    description: Payments. One row per order_id + payment_sequential.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, payment_sequential]
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_olist__orders')
+                field: order_id
+      - name: payment_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [credit_card, boleto, voucher, debit_card, not_defined]
+      - name: payment_value
+        description: Amount paid in BRL, including freight and instalment interest.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+  - name: stg_olist__order_reviews
+    description: >
+      Review survey answers. One row per review_id + order_id: the same review_id
+      can cover several orders, and some orders have several reviews.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [review_id, order_id]
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_olist__orders')
+                field: order_id
+      - name: review_score
+        description: Satisfaction score from 1 (worst) to 5 (best).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: answered_at
+        data_tests: [not_null]
+
+  - name: stg_olist__customers
+    description: >
+      One row per customer_id (one per order). Use customer_unique_id to count
+      real customers.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: customer_unique_id
+        description: Identifies the person across orders.
+        data_tests: [not_null]
+      - name: zip_code_prefix
+        description: First 5 digits of the zip code, kept as text (leading zeros matter).
+        data_tests: [not_null]
+      - name: city
+        description: Lowercase, accent-free city name.
+      - name: state
+        description: Two-letter Brazilian state code (SP, RJ, …).
+        data_tests: [not_null]
+
+  - name: stg_olist__sellers
+    description: One row per seller.
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+      - name: state
+        data_tests: [not_null]
+
+  - name: stg_olist__products
+    description: One row per product. Column names fixed ("lenght" → "length").
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: category_name
+        description: Portuguese category name; null for 610 products in the source.
+
+  - name: stg_olist__product_category_translation
+    description: Portuguese to English category names.
+    columns:
+      - name: category_name
+        data_tests: [unique, not_null]
+      - name: category_name_en
+        data_tests: [not_null]
+
+  - name: stg_olist__geolocation
+    description: Coordinates per zip code prefix (several rows per prefix).
+    columns:
+      - name: zip_code_prefix
+        data_tests: [not_null]
+      - name: is_in_brazil
+        description: False when the coordinates fall outside Brazil (bad geocoding).

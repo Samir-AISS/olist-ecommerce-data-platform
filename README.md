@@ -43,8 +43,8 @@ This project answers four questions with one shared, tested definition per metri
 | # | Business question | Where it is answered |
 |---|---|---|
 | 1 | **Why does revenue vary by region**, and what drove a decline in a given state? | `fct_order_items` × `dim_customers` · dashboard page *Sales* |
-| 2 | **Do late deliveries hurt review scores**, and by how much? | `fct_orders` · `analyses/late_delivery_vs_reviews.sql` |
-| 3 | **Which customers are worth retaining**, and how many ever come back? | `dim_customers` (RFM) · `analyses/monthly_cohorts.sql` |
+| 2 | **Do late deliveries hurt review scores**, and by how much? | `fct_orders` · `dbt/analyses/late_delivery_vs_reviews.sql` |
+| 3 | **Which customers are worth retaining**, and how many ever come back? | `dim_customers` (RFM) · `dbt/analyses/monthly_cohorts.sql` |
 | 4 | **Which categories and sellers drive revenue**, and which drive complaints? | `fct_order_items` × `dim_products` / `dim_sellers` |
 
 **Success criterion:** the dashboard explains *"why did revenue drop in this region?"* in three clicks.
@@ -118,12 +118,13 @@ flowchart LR
   subgraph S["staging"]
     s_ord["stg_olist__orders"]
     s_itm["stg_olist__order_items"]
-    s_pay["stg_olist__payments"]
-    s_rev["stg_olist__reviews"]
+    s_pay["stg_olist__order_payments"]
+    s_rev["stg_olist__order_reviews"]
     s_cus["stg_olist__customers"]
     s_prd["stg_olist__products"]
     s_sel["stg_olist__sellers"]
-    s_cat["stg_olist__category_translation"]
+    s_cat["stg_olist__product_category_translation"]
+    s_geo["stg_olist__geolocation"]
   end
 
   subgraph I["intermediate"]
@@ -158,7 +159,7 @@ flowchart LR
   classDef stg fill:#E6F3F6,stroke:#0E7490,color:#1A202C
   classDef int fill:#E8EDF6,stroke:#1C3A5E,color:#1A202C
   classDef mart fill:#FFF4E0,stroke:#B7791F,color:#1A202C
-  class s_ord,s_itm,s_pay,s_rev,s_cus,s_prd,s_sel,s_cat stg
+  class s_ord,s_itm,s_pay,s_rev,s_cus,s_prd,s_sel,s_cat,s_geo stg
   class i_pay,i_rev,i_ord,i_cus int
   class f_itm,f_ord,d_cus,d_prd,d_sel,d_dat mart
 ```
@@ -275,11 +276,24 @@ Tests run on every `dbt build`, locally and in CI. A failing test blocks the bui
 | **Business rules** | Numbers reconcile | Amount paid ≈ items + freight (within tolerance) · delivery date ≥ purchase date · revenue contains no cancelled orders |
 | **Code quality** | Readable, consistent code | `ruff` (Python) · `sqlfluff` (SQL) · `pre-commit` hooks |
 
+### What the staging tests found in the source data
+
+Measured on the full dataset by `make run` (staging: 9 models, 48 tests). Source anomalies are **flagged, not deleted**, so no order silently disappears.
+
+| Finding | Count | How it is handled |
+|---|---:|---|
+| Zip codes starting with `0` | 23,995 customers | Kept as text in `raw` and staging (a numeric cast would drop the zero) |
+| `review_id` values shared by several orders | 814 | Key is `review_id` + `order_id`, tested with `unique_combination_of_columns` |
+| Orders handed to the carrier **before** they were placed | 166 | Test with `severity: warn`: visible in every build, does not block it |
+| Geolocation points outside Brazil | 42 | Flagged with `is_in_brazil = false` |
+| Seller city spellings (`"sao paulo / sao paulo"`, `"lages - sc"`) | 611 → 593 distinct | Normalized by the `clean_city_name` macro |
+| Products without a category | 610 | Kept with a null category; handled in `dim_products` |
+
 ---
 
 ## Key findings
 
-🚧 *Filled in phase 5.* Each finding will link to the query in `analyses/` that produced it, so anyone can re-run it with one command.
+🚧 *Filled in phase 5.* Each finding will link to the query in `dbt/analyses/` that produced it, so anyone can re-run it with one command.
 
 ---
 
@@ -305,15 +319,15 @@ cd olist-ecommerce-data-platform
 
 make setup              # Python env (uv) + pre-commit hooks + .env from .env.example
 make up                 # start PostgreSQL in Docker and wait until healthy
-make run                # download the 9 CSV files → load the raw schema
+make run                # download the 9 CSV files → load raw → dbt build (models + tests)
+make docs               # browse the dbt documentation and lineage graph on localhost:8081
 ```
-
-`make run` currently stops after the raw layer; dbt models are added in phase 2 (see [roadmap](#roadmap)).
 
 | Command | What it does |
 |---|---|
 | `make test` | Unit tests + integration tests against PostgreSQL (`pytest`) |
-| `make lint` / `make format` | `ruff` checks / fixes |
+| `make lint` / `make format` | `ruff` + `sqlfluff` checks / fixes |
+| `make build` | `dbt build` only: run every model and its tests |
 | `make sample` | Rebuild the 500-order CI sample in `data/sample/` |
 | `make down` / `make reset-db` | Stop containers / also delete the database volume |
 | `make help` | List every command |
@@ -349,7 +363,7 @@ Row counts printed by `ingestion/load_raw.py` on the full dataset:
 | **Airflow** | Daily orchestration | Shows how the pipeline is scheduled and monitored in production |
 | **Tableau Public** | BI dashboard | Free, shareable public link |
 | **ruff · sqlfluff · pytest · pre-commit** | Code quality | Consistent style and safety net before every commit |
-| **GitHub Actions** | CI | Lint, tests and a full load of a 500-order sample on every pull request |
+| **GitHub Actions** | CI | Lint, tests, load of a 500-order sample and `dbt build` on every pull request |
 
 ---
 
@@ -363,9 +377,10 @@ olist-ecommerce-data-platform/
 │   ├── models/intermediate/    # int_*: joins and business rules
 │   ├── models/marts/           # fct_* and dim_*: the star schema
 │   ├── snapshots/              # order status history (SCD2)
+│   ├── analyses/               # advanced SQL: cohorts, window functions, findings
+│   ├── macros/                 # clean_city_name, schema naming
 │   └── tests/                  # singular business-rule tests
 ├── dags/                       # Airflow daily DAG
-├── analyses/                   # advanced SQL: cohorts, window functions, findings
 ├── dashboard/                  # Tableau exports, screenshots, public link
 ├── scripts/                    # make_sample.py: builds the CI sample
 ├── data/sample/                # 500-order sample committed for CI
@@ -384,9 +399,9 @@ olist-ecommerce-data-platform/
 | Phase | Scope | Verifiable deliverable | Status |
 |---|---|---|---|
 | 1 | Project skeleton: Docker, ingestion, tooling, CI | `make setup && make up && make run` loads the raw schema | ✅ |
-| 2 | dbt sources + staging layer, naming conventions | `dbt build` green on staging | ⬜ |
+| 2 | dbt sources + staging layer, naming conventions | `dbt build` green on staging | ✅ |
 | 3 | Intermediate + star schema, incremental model, snapshot, tests | Documented star schema, grain test passing | ⬜ |
-| 4 | KPI dictionary + advanced SQL analyses | `docs/kpi_dictionary.md`, `analyses/` | ⬜ |
+| 4 | KPI dictionary + advanced SQL analyses | `docs/kpi_dictionary.md`, `dbt/analyses/` | ⬜ |
 | 5 | Tableau exports, dashboard, findings, dbt docs | Public dashboard link + findings in this README | ⬜ |
 
 ---

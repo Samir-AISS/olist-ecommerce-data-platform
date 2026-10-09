@@ -1,0 +1,25 @@
+[sqlfluff]
+dialect = postgres
+templater = jinja
+max_line_length = 100
+# Staging models use "select * from renamed" as their final CTE, a dbt convention.
+exclude_rules = ambiguous.column_count, structure.column_order
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True
+load_macros_from_path = dbt/macros
+
+[sqlfluff:indentation]
+tab_space_size = 4
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower
