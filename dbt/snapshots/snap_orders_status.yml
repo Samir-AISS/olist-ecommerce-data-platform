@@ -1,0 +1,15 @@
+snapshots:
+  - name: snap_orders_status
+    description: >
+      History of order status changes (SCD type 2). Each run adds a new version of an
+      order when its status or a lifecycle date changes; dbt_valid_from / dbt_valid_to
+      give the period during which each version was true.
+    relation: source('olist', 'orders')
+    config:
+      unique_key: order_id
+      strategy: check
+      check_cols:
+        - order_status
+        - order_approved_at
+        - order_delivered_carrier_date
+        - order_delivered_customer_date

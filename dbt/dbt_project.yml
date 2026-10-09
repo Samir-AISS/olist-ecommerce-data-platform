@@ -16,3 +16,21 @@ models:
     staging:
       +schema: staging
       +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+
+seeds:
+  olist:
+    +schema: seeds
+
+snapshots:
+  olist:
+    +schema: snapshots
+
+vars:
+  # Days re-processed by the incremental fact table to catch late status updates
+  incremental_lookback_days: 30

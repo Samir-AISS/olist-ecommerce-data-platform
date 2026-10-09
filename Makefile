@@ -53,9 +53,9 @@ test: ## Run unit and integration tests
 lint: ## Check Python and SQL style
 	uv run ruff check .
 	uv run ruff format --check .
-	uv run sqlfluff lint dbt/models dbt/macros
+	uv run sqlfluff lint dbt/models dbt/macros dbt/tests
 
 format: ## Fix Python and SQL style
 	uv run ruff check --fix .
 	uv run ruff format .
-	uv run sqlfluff fix dbt/models dbt/macros
+	uv run sqlfluff fix dbt/models dbt/macros dbt/tests

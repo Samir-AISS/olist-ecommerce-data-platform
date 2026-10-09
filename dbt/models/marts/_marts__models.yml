@@ -1,0 +1,141 @@
+version: 2
+
+models:
+  - name: fct_order_items
+    description: >
+      Main fact table. Grain: one row per ordered item (order_id + order_item_id).
+      Incremental (delete+insert on order_item_sk).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          description: Grain test. Fails if an item appears twice.
+          arguments:
+            combination_of_columns: [order_id, order_item_id]
+    columns:
+      - name: order_item_sk
+        description: Surrogate key, hash of order_id + order_item_id.
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+      - name: customer_unique_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_unique_id
+      - name: customer_state
+        description: Customer's state at the time of the order (dim_customers holds the latest one).
+        data_tests: [not_null]
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+      - name: seller_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_id
+      - name: purchase_date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+      - name: price
+        description: Item price in BRL, excluding freight.
+      - name: revenue
+        description: KPI "Revenue" at item level. Item price if the order is delivered, else 0. Freight excluded.
+        data_tests: [not_null]
+
+  - name: fct_orders
+    description: "Grain: one row per order."
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_unique_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_unique_id
+      - name: purchase_date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+      - name: estimated_delivery_date
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+      - name: revenue
+        description: Items amount if the order is delivered, else 0. Freight excluded.
+        data_tests: [not_null]
+      - name: review_score
+        description: Score of the latest review (1-5); null for the orders never reviewed.
+      - name: delivery_delay_days
+        description: Actual minus promised delivery date, in days. Positive = late.
+      - name: is_late
+        description: Delivered after the promised date. Null when not delivered.
+
+  - name: dim_customers
+    description: "Grain: one row per real customer (customer_unique_id), with RFM segment."
+    columns:
+      - name: customer_unique_id
+        data_tests: [unique, not_null]
+      - name: rfm_segment
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - champions
+                  - loyal
+                  - big_spenders
+                  - recent
+                  - need_attention
+                  - at_risk
+                  - lost
+                  - no_delivered_order
+      - name: r_score
+        description: Recency quintile (5 = most recent delivered order).
+      - name: f_score
+        description: Frequency band (1 order = 1, 2 orders = 3, 3+ orders = 5).
+      - name: m_score
+        description: Lifetime revenue quintile (5 = highest).
+
+  - name: dim_products
+    description: "Grain: one row per product."
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: category_name_en
+        description: English category; "unknown" when the source has no category.
+        data_tests: [not_null]
+
+  - name: dim_sellers
+    description: "Grain: one row per seller."
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+
+  - name: dim_date
+    description: "Grain: one row per calendar day, 2016-2018, with Brazilian holidays."
+    columns:
+      - name: date_day
+        data_tests: [unique, not_null]

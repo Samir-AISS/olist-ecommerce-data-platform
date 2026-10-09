@@ -1,0 +1,19 @@
+version: 2
+
+seeds:
+  - name: br_national_holidays
+    description: >
+      Brazilian national holidays 2016-2018. Carnival, Good Friday and Corpus Christi
+      are derived from Easter (Easter − 48/−47, −2 and +60 days).
+    config:
+      column_types:
+        holiday_date: date
+    columns:
+      - name: holiday_date
+        data_tests: [unique, not_null]
+
+  - name: category_translation_overrides
+    description: English names for the 2 categories missing from the source translation file.
+    columns:
+      - name: category_name
+        data_tests: [unique, not_null]

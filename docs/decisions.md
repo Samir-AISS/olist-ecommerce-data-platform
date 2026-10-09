@@ -66,3 +66,31 @@ Short records of the technical choices made in this project: context, decision, 
 - **Decision:** override `generate_schema_name` so models land in `staging`, `intermediate` and `marts`, next to `raw`.
 - **Alternatives:** keep dbt's default — rejected: longer names, harder to read in BI tools.
 - **Consequences:** the database mirrors the architecture diagram. A shared multi-developer setup would need per-developer schemas again.
+
+## ADR-010 · Business rules defined once, in the intermediate layer
+
+- **Context:** "delivered" and "late" are used by several marts and KPIs. Defining them in each model invites drift.
+- **Decision:** `int_orders_enriched` defines `is_delivered` (`order_status = 'delivered'`) and `is_late` (delivered after the promised date). Marts reuse these columns; `revenue` = price (or items amount) when `is_delivered`, else 0.
+- **Alternatives:** compute KPIs in the BI tool — rejected: each dashboard would re-implement the rule.
+- **Consequences:** a singular test checks that revenue is identical from `fct_order_items` and `fct_orders`, and another that no undelivered order carries revenue.
+
+## ADR-011 · Incremental fact table with a look-back window
+
+- **Context:** `fct_order_items` is the largest mart. Olist has no `updated_at` column, and an order's status can change after purchase.
+- **Decision:** `incremental` with `delete+insert` on `order_item_sk`; each run re-processes orders purchased in the last `incremental_lookback_days` (30) before the latest loaded purchase.
+- **Alternatives:** full rebuild each time — simpler but does not scale; `append` — rejected: duplicates when a status changes.
+- **Consequences:** changes older than 30 days need `dbt build --full-refresh`. The status history itself is kept by the snapshot.
+
+## ADR-012 · RFM: quintiles for recency and monetary, fixed bands for frequency
+
+- **Context:** 97% of customers placed a single delivered order. `NTILE(5)` on frequency would split identical values arbitrarily.
+- **Decision:** R and M are `NTILE(5)` quintiles (ties broken by `customer_unique_id`, so results are deterministic); F uses bands (1 order = 1, 2 = 3, 3+ = 5). Recency is measured from the last purchase in the dataset, not from today.
+- **Alternatives:** classic 5×5×5 quintiles — rejected for the reason above.
+- **Consequences:** segments (champions, loyal, big_spenders, recent, need_attention, at_risk, lost) are reproducible and documented in `dim_customers`.
+
+## ADR-013 · Customer state at order time on the facts
+
+- **Context:** a customer (`customer_unique_id`) can order from different addresses.
+- **Decision:** facts carry `customer_state` from the order's own `customer_id`; `dim_customers` keeps the latest address.
+- **Alternatives:** join facts to `dim_customers.state` — rejected: past revenue would move to the region the customer lives in today.
+- **Consequences:** regional revenue is historically correct; the dimension stays one row per person.

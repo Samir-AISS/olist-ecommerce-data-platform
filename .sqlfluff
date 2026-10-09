@@ -8,6 +8,7 @@ exclude_rules = ambiguous.column_count, structure.column_order
 [sqlfluff:templater:jinja]
 apply_dbt_builtins = True
 load_macros_from_path = dbt/macros
+library_path = dbt/sqlfluff_libs
 
 [sqlfluff:indentation]
 tab_space_size = 4
@@ -23,3 +24,7 @@ capitalisation_policy = lower
 
 [sqlfluff:rules:capitalisation.types]
 extended_capitalisation_policy = lower
+
+[sqlfluff:rules:references.keywords]
+# Standard calendar column names in dim_date
+ignore_words = year,quarter,month,year_month

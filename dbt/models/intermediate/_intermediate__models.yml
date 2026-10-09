@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: int_payments_per_order
+    description: One row per order with payments aggregated; main_payment_type is the largest payment.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+
+  - name: int_reviews_per_order
+    description: One row per reviewed order; the latest answered review wins.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+
+  - name: int_items_per_order
+    description: One row per order that has items, with item and freight amounts.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+
+  - name: int_orders_enriched
+    description: >
+      One row per order with the real customer key, amounts, latest review and delivery
+      metrics. Defines is_delivered and is_late, reused by every mart.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_unique_id
+        data_tests: [not_null]
+
+  - name: int_customer_orders
+    description: One row per customer_unique_id with order history and latest address.
+    columns:
+      - name: customer_unique_id
+        data_tests: [unique, not_null]
+
+  - name: int_zip_code_locations
+    description: Average coordinates per zip code prefix, from points inside Brazil only.
+    columns:
+      - name: zip_code_prefix
+        data_tests: [unique, not_null]

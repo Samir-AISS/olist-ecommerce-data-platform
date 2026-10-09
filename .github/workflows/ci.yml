@@ -40,7 +40,7 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
-          uv run sqlfluff lint dbt/models dbt/macros
+          uv run sqlfluff lint dbt/models dbt/macros dbt/tests
       - name: Unit and integration tests
         run: uv run pytest -v
       - name: Load the sample into the raw schema
