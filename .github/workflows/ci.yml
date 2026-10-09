@@ -40,7 +40,7 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
-          uv run sqlfluff lint dbt/models dbt/macros dbt/tests
+          uv run sqlfluff lint dbt/models dbt/macros dbt/tests dbt/analyses
       - name: Unit and integration tests
         run: uv run pytest -v
       - name: Load the sample into the raw schema
@@ -49,3 +49,7 @@ jobs:
         run: |
           uv run dbt deps
           uv run dbt build
+      - name: Run the SQL analyses on the sample
+        run: |
+          uv run dbt compile --select "resource_type:analysis" --quiet
+          uv run python scripts/run_analyses.py --output "$RUNNER_TEMP/findings.md"

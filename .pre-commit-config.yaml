@@ -22,4 +22,4 @@ repos:
         name: sqlfluff lint
         entry: uv run sqlfluff lint
         language: system
-        files: ^dbt/(models|macros|tests)/.*\.sql$
+        files: ^dbt/(models|macros|tests|analyses)/.*\.sql$

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup up down reset-db download load deps build run docs sample test lint format
+.PHONY: help setup up down reset-db download load deps build run findings docs sample test lint format
 
 # Database credentials for dbt and Python (dbt does not read .env on its own)
 -include .env
@@ -40,6 +40,10 @@ build: deps ## Build and test every dbt model
 
 run: download load build ## Run the pipeline end to end
 
+findings: deps ## Run the SQL analyses and regenerate docs/findings.md
+	$(DBT) compile --select "resource_type:analysis" --quiet
+	uv run python scripts/run_analyses.py
+
 docs: deps ## Generate and serve the dbt documentation (lineage graph)
 	$(DBT) docs generate
 	$(DBT) docs serve --port 8081
@@ -53,9 +57,9 @@ test: ## Run unit and integration tests
 lint: ## Check Python and SQL style
 	uv run ruff check .
 	uv run ruff format --check .
-	uv run sqlfluff lint dbt/models dbt/macros dbt/tests
+	uv run sqlfluff lint dbt/models dbt/macros dbt/tests dbt/analyses
 
 format: ## Fix Python and SQL style
 	uv run ruff check --fix .
 	uv run ruff format .
-	uv run sqlfluff fix dbt/models dbt/macros dbt/tests
+	uv run sqlfluff fix dbt/models dbt/macros dbt/tests dbt/analyses

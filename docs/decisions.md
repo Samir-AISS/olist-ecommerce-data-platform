@@ -94,3 +94,10 @@ Short records of the technical choices made in this project: context, decision, 
 - **Decision:** facts carry `customer_state` from the order's own `customer_id`; `dim_customers` keeps the latest address.
 - **Alternatives:** join facts to `dim_customers.state` — rejected: past revenue would move to the region the customer lives in today.
 - **Consequences:** regional revenue is historically correct; the dimension stays one row per person.
+
+## ADR-014 · Findings generated from versioned queries
+
+- **Context:** a portfolio README often quotes numbers that nobody can reproduce.
+- **Decision:** every analysis is a dbt analysis in `dbt/analyses/` (so it uses `ref()` and the tested marts). `make findings` compiles and runs them and rewrites `docs/findings.md`. The README only quotes numbers from that file.
+- **Alternatives:** notebooks — rejected: hidden state, hard to review in a pull request.
+- **Consequences:** CI runs every analysis on the sample, so a query broken by a model change fails the build.
