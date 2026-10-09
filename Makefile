@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup up down reset-db download load deps build run findings export docs sample test lint format
+.PHONY: help setup up down reset-db download load deps build run findings export docs airflow-up airflow-down sample test lint format
 
 # Database credentials for dbt and Python (dbt does not read .env on its own)
 -include .env
@@ -50,6 +50,12 @@ export: ## Export the star schema to data/exports/*.csv for Tableau
 docs: deps ## Generate and serve the dbt documentation (lineage graph)
 	$(DBT) docs generate
 	$(DBT) docs serve --port 8081
+
+airflow-up: ## Start Airflow on localhost:8080 (daily DAG olist_daily)
+	docker compose --profile airflow up -d --build --wait
+
+airflow-down: ## Stop Airflow
+	docker compose --profile airflow stop airflow airflow-db
 
 sample: ## Rebuild the CI sample in data/sample from data/raw
 	uv run python scripts/make_sample.py

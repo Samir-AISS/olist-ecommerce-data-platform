@@ -182,6 +182,29 @@ flowchart LR
 
 ---
 
+### Orchestration
+
+`dags/olist_daily.py` runs every day at 06:00: one task per step, so a failing test points to the layer that broke. Retries: 2, five minutes apart.
+
+```mermaid
+flowchart LR
+  download_csv --> load_raw --> dbt_deps
+  dbt_deps --> dbt_seed
+  dbt_deps --> dbt_staging
+  dbt_staging --> dbt_snapshot
+  dbt_staging --> dbt_intermediate
+  dbt_seed --> dbt_marts
+  dbt_intermediate --> dbt_marts
+  dbt_marts --> export_for_tableau
+
+  classDef task fill:#E6F3F6,stroke:#0E7490,color:#1A202C
+  class download_csv,load_raw,dbt_deps,dbt_seed,dbt_staging,dbt_snapshot,dbt_intermediate,dbt_marts,export_for_tableau task
+```
+
+A full run on the complete dataset (Airflow 3.3.2, `airflow dags test olist_daily`) succeeds in about 4 min 40 s. In Docker, dbt and the ingestion code live in their own virtualenv inside the Airflow image, so their dependencies never clash with Airflow's.
+
+---
+
 ## Data model
 
 ```mermaid
@@ -429,6 +452,7 @@ make up                 # start PostgreSQL in Docker and wait until healthy
 make run                # download the 9 CSV files → load raw → dbt build (models + tests)
 make findings           # run the SQL analyses → docs/findings.md
 make export             # star schema → data/exports/*.csv for Tableau
+make airflow-up         # optional: Airflow UI on localhost:8080 with the daily DAG
 make docs               # browse the dbt documentation and lineage graph on localhost:8081
 ```
 
@@ -439,6 +463,7 @@ make docs               # browse the dbt documentation and lineage graph on loca
 | `make build` | `dbt build` only: run every model and its tests |
 | `make sample` | Rebuild the 500-order CI sample in `data/sample/` |
 | `make down` / `make reset-db` | Stop containers / also delete the database volume |
+| `make airflow-up` / `make airflow-down` | Start / stop Airflow (Docker profile `airflow`) |
 | `make help` | List every command |
 
 ### Raw layer after `make run`
@@ -490,7 +515,8 @@ olist-ecommerce-data-platform/
 │   ├── seeds/                  # Brazilian holidays, missing category translations
 │   ├── macros/                 # clean_city_name, schema naming
 │   └── tests/                  # singular business-rule tests
-├── dags/                       # Airflow daily DAG
+├── dags/                       # Airflow daily DAG (olist_daily)
+├── docker/airflow/             # Airflow image with an isolated pipeline virtualenv
 ├── dashboard/                  # Tableau build guide, screenshots, public link
 ├── scripts/                    # CI sample, findings and Tableau export scripts
 ├── data/sample/                # 500-order sample committed for CI
@@ -514,7 +540,7 @@ olist-ecommerce-data-platform/
 | 3 | Intermediate + star schema, incremental model, snapshot, tests | Documented star schema, grain test passing | ✅ |
 | 4 | KPI dictionary + advanced SQL analyses | `docs/kpi_dictionary.md`, `dbt/analyses/` | ✅ |
 | 5 | Findings, Tableau exports, dashboard guide, dbt docs on GitHub Pages | Findings in this README, public dbt docs | ✅ |
-| 6 | Airflow daily DAG | DAG green in the Airflow UI | ⬜ |
+| 6 | Airflow daily DAG | Full DAG run green; DAG import checked in CI | ✅ |
 | 7 | Tableau Public dashboard | Public link + screenshots in this README | ⬜ |
 
 ---|---|---|---|
