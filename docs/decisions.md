@@ -52,3 +52,17 @@ Short records of the technical choices made in this project: context, decision, 
 - **Decision:** `scripts/make_sample.py` picks 500 orders deterministically and keeps every related row (items, payments, reviews, customers, products, sellers, geolocation). The 500 KB sample is committed in `data/sample/` (dataset license CC BY-NC-SA 4.0, attributed in the README).
 - **Alternatives:** download the full dataset in CI — rejected: slow and needs network access to Kaggle; random sampling — rejected: not reproducible and breaks foreign keys.
 - **Consequences:** CI loads a referentially consistent dataset in seconds; a test guards that consistency.
+
+## ADR-008 · Source anomalies are flagged, not deleted
+
+- **Context:** profiling found orders handed to the carrier before purchase (166), geolocation points outside Brazil (42) and shared `review_id` values (814).
+- **Decision:** staging keeps every row. Anomalies get a flag column (`is_in_brazil`) or a test with `severity: warn`; keys are adapted to the real grain (`review_id` + `order_id`).
+- **Alternatives:** filter bad rows in staging — rejected: revenue and order counts would silently drift from the source, and nobody would know why.
+- **Consequences:** every `dbt build` shows the anomaly count; downstream models decide explicitly what to exclude.
+
+## ADR-009 · One PostgreSQL schema per dbt layer
+
+- **Context:** by default dbt names custom schemas `<target>_<custom>` (e.g. `analytics_staging`).
+- **Decision:** override `generate_schema_name` so models land in `staging`, `intermediate` and `marts`, next to `raw`.
+- **Alternatives:** keep dbt's default — rejected: longer names, harder to read in BI tools.
+- **Consequences:** the database mirrors the architecture diagram. A shared multi-developer setup would need per-developer schemas again.

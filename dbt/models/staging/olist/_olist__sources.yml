@@ -1,0 +1,29 @@
+version: 2
+
+sources:
+  - name: olist
+    description: >
+      Brazilian E-Commerce Public Dataset by Olist (Kaggle, CC BY-NC-SA 4.0),
+      loaded as-is (every column TEXT) by ingestion/load_raw.py.
+    schema: raw
+    tables:
+      - name: orders
+        description: One row per order, with its status and lifecycle timestamps.
+      - name: order_items
+        description: One row per item in an order (order_id + order_item_id).
+      - name: order_payments
+        description: One row per payment of an order; an order can be paid in several ways.
+      - name: order_reviews
+        description: Satisfaction survey answers. review_id alone is not unique.
+      - name: customers
+        description: >
+          One row per customer_id. customer_id is regenerated for every order;
+          customer_unique_id identifies the person.
+      - name: products
+        description: One row per product, with category (Portuguese) and dimensions.
+      - name: sellers
+        description: One row per seller.
+      - name: geolocation
+        description: Coordinates per zip code prefix; several rows per prefix.
+      - name: product_category_name_translation
+        description: Portuguese to English category names.

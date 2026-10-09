@@ -27,6 +27,8 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
       REQUIRE_DB: "1"
+      DBT_PROJECT_DIR: dbt
+      DBT_PROFILES_DIR: dbt
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -38,7 +40,12 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
+          uv run sqlfluff lint dbt/models dbt/macros
       - name: Unit and integration tests
         run: uv run pytest -v
-      - name: Load the sample end to end
+      - name: Load the sample into the raw schema
         run: uv run python -m ingestion.load_raw --data-dir data/sample
+      - name: dbt build (models + tests) on the sample
+        run: |
+          uv run dbt deps
+          uv run dbt build
