@@ -53,3 +53,5 @@ jobs:
         run: |
           uv run dbt compile --select "resource_type:analysis" --quiet
           uv run python scripts/run_analyses.py --output "$RUNNER_TEMP/findings.md"
+      - name: Export the marts for Tableau
+        run: uv run python scripts/export_marts.py --output-dir "$RUNNER_TEMP/exports"

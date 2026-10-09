@@ -1,0 +1,70 @@
+name: dbt docs
+
+# Builds the warehouse on the CI sample and publishes the dbt documentation
+# (model descriptions, tests, lineage graph) to GitHub Pages.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: olist
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: olist
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U olist"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_USER: olist
+      POSTGRES_PASSWORD: ci-only-password
+      POSTGRES_DB: olist
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      DBT_PROJECT_DIR: dbt
+      DBT_PROFILES_DIR: dbt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Build the warehouse on the sample
+        run: |
+          uv run python -m ingestion.load_raw --data-dir data/sample
+          uv run dbt deps
+          uv run dbt build
+      - name: Generate the documentation
+        run: |
+          uv run dbt docs generate
+          mkdir -p site
+          cp dbt/target/index.html dbt/target/manifest.json dbt/target/catalog.json site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

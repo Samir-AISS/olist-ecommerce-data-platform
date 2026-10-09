@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup up down reset-db download load deps build run findings docs sample test lint format
+.PHONY: help setup up down reset-db download load deps build run findings export docs sample test lint format
 
 # Database credentials for dbt and Python (dbt does not read .env on its own)
 -include .env
@@ -43,6 +43,9 @@ run: download load build ## Run the pipeline end to end
 findings: deps ## Run the SQL analyses and regenerate docs/findings.md
 	$(DBT) compile --select "resource_type:analysis" --quiet
 	uv run python scripts/run_analyses.py
+
+export: ## Export the star schema to data/exports/*.csv for Tableau
+	uv run python scripts/export_marts.py
 
 docs: deps ## Generate and serve the dbt documentation (lineage graph)
 	$(DBT) docs generate
