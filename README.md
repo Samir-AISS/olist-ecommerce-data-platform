@@ -12,8 +12,10 @@ Raw CSVs in, tested star schema and business answers out — every KPI defined o
 ![Tableau](https://img.shields.io/badge/Tableau-Public-E97627?logo=tableau&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+**[dbt documentation & lineage →](https://samir-aiss.github.io/olist-ecommerce-data-platform/)** · [KPI dictionary](docs/kpi_dictionary.md) · [Findings](docs/findings.md) · [Design decisions](docs/decisions.md)
+
 > [!NOTE]
-> This project is being built in public, phase by phase. Sections marked 🚧 are filled in as each phase lands — see the [roadmap](#roadmap). No number in this README is typed by hand: every figure is produced by a query in this repository.
+> No number in this README is typed by hand: every figure is produced by a query in [`dbt/analyses/`](dbt/analyses/) and collected in [docs/findings.md](docs/findings.md) by `make findings`.
 
 ---
 
@@ -25,8 +27,8 @@ Raw CSVs in, tested star schema and business answers out — every KPI defined o
 - [KPI definitions](#kpi-definitions)
 - [Advanced SQL analyses](#advanced-sql-analyses)
 - [Data quality](#data-quality)
-- [Key findings](#key-findings) 🚧
-- [Dashboard](#dashboard) 🚧
+- [Key findings](#key-findings)
+- [Dashboard](#dashboard)
 - [Quick start](#quick-start)
 - [Tech stack](#tech-stack)
 - [Repository structure](#repository-structure)
@@ -366,19 +368,51 @@ Payments match items + freight to the cent for 98,362 of the 98,665 orders that 
 
 ## Key findings
 
-🚧 *Filled in phase 5.* Each finding will link to the query in `dbt/analyses/` that produced it, so anyone can re-run it with one command.
+Full results and queries: [docs/findings.md](docs/findings.md).
+
+### 1. Late deliveries destroy satisfaction, and the damage starts at day one
+
+| Delivered vs promised date | Orders | Avg review | 1–2 star reviews |
+|---|---:|---:|---:|
+| 10+ days early | 61,523 | 4.32 | 8.9 % |
+| 0–9 days early | 27,920 | 4.22 | 10.1 % |
+| 1–3 days late | 1,852 | 3.29 | 32.1 % |
+| 4–7 days late | 1,748 | 2.10 | 67.7 % |
+| 8–14 days late | 1,446 | 1.67 | 80.2 % |
+
+Only 6.6 % of reviewed orders arrive late, but a delay of 4 days or more turns two thirds of them into 1–2 star reviews. **Action:** promise dates are a lever as strong as speed: most orders already arrive 10+ days early, so the buffer could be reallocated to the routes that miss it. *([query](dbt/analyses/04_late_delivery_vs_reviews.sql))*
+
+### 2. Revenue is concentrated in the South-East; distance costs freight, time and stars
+
+São Paulo alone makes **38.3 %** of revenue, with an 8.7-day average delivery and a 4.5 % late rate (review 4.25). In the North-East, freight weighs far more and customers wait 2–3× longer: Maranhão pays **26.3 %** of the item value in freight with a 17.4 % late rate (review 3.83); Alagoas waits **24.5 days** on average with a **21.4 %** late rate (review 3.85). Rio de Janeiro is the outlier among large states: **12.1 %** late vs 4.5 % for São Paulo, and a 3.97 review. *([query](dbt/analyses/02_revenue_by_state.sql))*
+
+### 3. Almost nobody comes back
+
+The repeat purchase rate is **3.00 %** (customers counted with `customer_unique_id`). No 2017 monthly cohort exceeds **3.75 %** of customers buying again within 12 months, and fewer than 1 % return the following month. Growth comes from acquisition; retention is the untapped lever. *([cohorts](dbt/analyses/05_monthly_cohorts.sql))*
+
+### 4. Revenue depends on a few sellers and categories, and on the RFM segments to protect
+
+- The top 10 % of sellers make **67.1 %** of revenue; the bottom half makes 3.3 %. *([query](dbt/analyses/07_seller_concentration.sql))*
+- The top 7 of 74 categories make **49.9 %** of revenue (health & beauty first, 9.3 %). *([query](dbt/analyses/06_category_pareto.sql))*
+- `big_spenders` (10.9 % of customers) hold **30.5 %** of revenue, and `at_risk` customers (14.8 %, last order ~443 days ago) another **28.9 %**: the first target for a win-back campaign. *([query](dbt/analyses/08_rfm_segments.sql))*
+
+### 5. Black Friday multiplies orders by five
+
+On Black Friday 2017 the marketplace received **1,166 orders**, against **217 per day** on the other days of November (5.4×), for 149,916.58 BRL of revenue in a single day. *([query](dbt/analyses/09_black_friday.sql))*
 
 ---
 
 ## Dashboard
 
-🚧 *Built in Tableau Public in phase 5 — three pages:*
+Tableau Public, three pages built on CSV exports of the star schema (`make export`). The build guide, with every calculated field mapped to the KPI dictionary, is in [dashboard/README.md](dashboard/README.md).
 
 | Page | Audience | Answers |
 |---|---|---|
-| **Executive** | Leadership | Revenue, orders, AOV and late-delivery trends at a glance |
-| **Sales** | Sales managers | Revenue by state, category and seller, with drill-down |
-| **Customers** | CRM team | RFM segments, monthly cohorts, repeat purchase rate |
+| **Executive** | Leadership | Revenue, orders, AOV, late-delivery and satisfaction trends at a glance |
+| **Sales** | Sales managers | "Why did revenue drop in this region?" in three clicks: state → month → category and sellers |
+| **Customers** | CRM team | RFM segments, monthly cohort retention, repeat purchase rate |
+
+*Public link and screenshots: coming with the published dashboard.*
 
 ---
 
@@ -394,6 +428,7 @@ make setup              # Python env (uv) + pre-commit hooks + .env from .env.ex
 make up                 # start PostgreSQL in Docker and wait until healthy
 make run                # download the 9 CSV files → load raw → dbt build (models + tests)
 make findings           # run the SQL analyses → docs/findings.md
+make export             # star schema → data/exports/*.csv for Tableau
 make docs               # browse the dbt documentation and lineage graph on localhost:8081
 ```
 
@@ -456,8 +491,8 @@ olist-ecommerce-data-platform/
 │   ├── macros/                 # clean_city_name, schema naming
 │   └── tests/                  # singular business-rule tests
 ├── dags/                       # Airflow daily DAG
-├── dashboard/                  # Tableau exports, screenshots, public link
-├── scripts/                    # make_sample.py (CI sample), run_analyses.py (findings)
+├── dashboard/                  # Tableau build guide, screenshots, public link
+├── scripts/                    # CI sample, findings and Tableau export scripts
 ├── data/sample/                # 500-order sample committed for CI
 ├── tests/                      # Python tests
 ├── docs/
@@ -474,6 +509,15 @@ olist-ecommerce-data-platform/
 
 | Phase | Scope | Verifiable deliverable | Status |
 |---|---|---|---|
+| 1 | Project skeleton: Docker, ingestion, tooling, CI | `make setup && make up && make run` loads the raw schema | ✅ |
+| 2 | dbt sources + staging layer, naming conventions | `dbt build` green on staging | ✅ |
+| 3 | Intermediate + star schema, incremental model, snapshot, tests | Documented star schema, grain test passing | ✅ |
+| 4 | KPI dictionary + advanced SQL analyses | `docs/kpi_dictionary.md`, `dbt/analyses/` | ✅ |
+| 5 | Findings, Tableau exports, dashboard guide, dbt docs on GitHub Pages | Findings in this README, public dbt docs | ✅ |
+| 6 | Airflow daily DAG | DAG green in the Airflow UI | ⬜ |
+| 7 | Tableau Public dashboard | Public link + screenshots in this README | ⬜ |
+
+---|---|---|---|
 | 1 | Project skeleton: Docker, ingestion, tooling, CI | `make setup && make up && make run` loads the raw schema | ✅ |
 | 2 | dbt sources + staging layer, naming conventions | `dbt build` green on staging | ✅ |
 | 3 | Intermediate + star schema, incremental model, snapshot, tests | Documented star schema, grain test passing | ✅ |

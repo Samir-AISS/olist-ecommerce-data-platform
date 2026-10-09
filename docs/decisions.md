@@ -101,3 +101,10 @@ Short records of the technical choices made in this project: context, decision, 
 - **Decision:** every analysis is a dbt analysis in `dbt/analyses/` (so it uses `ref()` and the tested marts). `make findings` compiles and runs them and rewrites `docs/findings.md`. The README only quotes numbers from that file.
 - **Alternatives:** notebooks — rejected: hidden state, hard to review in a pull request.
 - **Consequences:** CI runs every analysis on the sample, so a query broken by a model change fails the build.
+
+## ADR-015 · Tableau Public fed by CSV exports; dbt docs on GitHub Pages
+
+- **Context:** Tableau Public (free) cannot connect to a database. Recruiters should be able to browse the models without running anything.
+- **Decision:** `make export` writes the six star-schema tables to CSV with `COPY` (booleans as `true`/`false`); Tableau relates them on their keys, keeping each table's grain. A GitHub Actions workflow builds the warehouse on the sample and publishes `dbt docs` to GitHub Pages on every merge.
+- **Alternatives:** one wide denormalized export — rejected: order-level measures would be duplicated per item; Metabase or Superset — possible, but Tableau Public gives a shareable public link.
+- **Consequences:** the dashboard must be refreshed by re-exporting; the public docs show the sample's catalog statistics but the full lineage and every test.
