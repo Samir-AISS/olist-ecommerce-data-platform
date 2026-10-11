@@ -27,7 +27,9 @@ history as (
         count(*) as orders_count,
         count(*) filter (where is_delivered) as delivered_orders,
         max(purchased_at) filter (where is_delivered) as last_delivered_order_at,
-        coalesce(sum(items_amount) filter (where is_delivered), 0) as lifetime_revenue
+        -- fixed scale: a bare 0 would export as "0" and make Tableau type the column as integer
+        coalesce(sum(items_amount) filter (where is_delivered), 0)::numeric(14, 2)
+            as lifetime_revenue
     from orders
     group by customer_unique_id
 )

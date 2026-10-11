@@ -2,7 +2,9 @@
 
 Three pages built on the star schema. Every measure re-uses a definition from [docs/kpi_dictionary.md](../docs/kpi_dictionary.md), so the dashboard shows the same numbers as [docs/findings.md](../docs/findings.md).
 
-**Public link:** *to be added once published*
+**Public link:** [Olist - Ecommerce-Plateforme](https://public.tableau.com/app/profile/samir.el.aissa/viz/Olist-Ecommerce-Plateforme/Executive)
+
+Screenshots: [Executive](screenshots/executive.png) · [Sales](screenshots/sales.png) · [Customers](screenshots/customers.png)
 
 | Page | Audience | Question it answers |
 |---|---|---|
@@ -49,7 +51,8 @@ Create these once and use them everywhere. They match the KPI dictionary exactly
 | `Repeat Purchase Rate` | `SUM(IF [Is Repeat Customer] THEN 1 ELSE 0 END) / SUM(IF [Delivered Orders (dim_customers)] > 0 THEN 1 ELSE 0 END)` | `dim_customers` |
 | `Delay Bucket` | see below | `fct_orders` |
 | `Cohort Month` | `{FIXED [Customer Unique Id] : MIN(IF [Is Delivered] THEN DATETRUNC('month', [Purchase Date]) END)}` | `fct_orders` |
-| `Months Since First Order` | `DATEDIFF('month', [Cohort Month], DATETRUNC('month', [Purchase Date]))` | `fct_orders` |
+| `Months Since First Order` | `DATEDIFF('month', [Cohort Month], DATETRUNC('month', [Purchase Date]))` (convert to a discrete dimension) | `fct_orders` |
+| `Retention %` | `COUNTD([Customer Unique Id]) / LOOKUP(COUNTD([Customer Unique Id]), FIRST())`, computed along `Months Since First Order` | `fct_orders` |
 
 ```text
 // Delay Bucket: same buckets as dbt/analyses/04_late_delivery_vs_reviews.sql
@@ -86,9 +89,10 @@ Also show `Late Delivery Rate` and `Avg Review Score` for the selection: a drop 
 ### Customers
 
 - **RFM segments** (treemap: size = customers, colour = revenue share, label = `rfm_segment`).
-- **Cohort retention** (heatmap: rows `Cohort Month`, columns `Months Since First Order`, colour = distinct customers as a percent of month 0, table calculation *Percent of total* along the row, restricted to 2017 cohorts).
-- `Repeat Purchase Rate` tile and **customers map** (`dim_customers` latitude / longitude).
-- Filter: `rfm_segment`, `state`.
+- **Cohort retention** (heatmap: rows `Cohort Month`, columns `Months Since First Order`, colour = `Retention %`, i.e. distinct customers as a percent of month 0, restricted to 2017 cohorts; fix the colour range to 0-0.8 % so month 0 does not flatten it).
+- KPI row: customers, `Repeat Purchase Rate`, `Avg Review Score`.
+- **Repeat purchase rate by state** (filled map on `dim_customers.state`, the customer's state, not the seller's).
+- Filter action: clicking an RFM segment filters the KPI row and the map.
 
 ## 5. Publish
 
