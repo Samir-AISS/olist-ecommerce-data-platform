@@ -435,7 +435,13 @@ Tableau Public, three pages built on CSV exports of the star schema (`make expor
 | **Sales** | Sales managers | "Why did revenue drop in this region?" in three clicks: state → month → category and sellers |
 | **Customers** | CRM team | RFM segments, monthly cohort retention, repeat purchase rate |
 
-*Public link and screenshots: coming with the published dashboard.*
+**Public link:** [Olist - Ecommerce-Plateforme on Tableau Public](https://public.tableau.com/app/profile/samir.el.aissa/viz/Olist-Ecommerce-Plateforme/Executive).
+
+![Executive page](dashboard/screenshots/executive.png)
+
+![Sales page](dashboard/screenshots/sales.png)
+
+![Customers page](dashboard/screenshots/customers.png)
 
 ---
 
@@ -541,7 +547,7 @@ olist-ecommerce-data-platform/
 | 4 | KPI dictionary + advanced SQL analyses | `docs/kpi_dictionary.md`, `dbt/analyses/` | ✅ |
 | 5 | Findings, Tableau exports, dashboard guide, dbt docs on GitHub Pages | Findings in this README, public dbt docs | ✅ |
 | 6 | Airflow daily DAG | Full DAG run green; DAG import checked in CI | ✅ |
-| 7 | Tableau Public dashboard | Public link + screenshots in this README | ⬜ |
+| 7 | Tableau Public dashboard | Public link + screenshots in this README | ✅ |
 
 ---|---|---|---|
 | 1 | Project skeleton: Docker, ingestion, tooling, CI | `make setup && make up && make run` loads the raw schema | ✅ |
