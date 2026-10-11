@@ -549,12 +549,6 @@ olist-ecommerce-data-platform/
 | 6 | Airflow daily DAG | Full DAG run green; DAG import checked in CI | ✅ |
 | 7 | Tableau Public dashboard | Public link + screenshots in this README | ✅ |
 
----|---|---|---|
-| 1 | Project skeleton: Docker, ingestion, tooling, CI | `make setup && make up && make run` loads the raw schema | ✅ |
-| 2 | dbt sources + staging layer, naming conventions | `dbt build` green on staging | ✅ |
-| 3 | Intermediate + star schema, incremental model, snapshot, tests | Documented star schema, grain test passing | ✅ |
-| 4 | KPI dictionary + advanced SQL analyses | `docs/kpi_dictionary.md`, `dbt/analyses/` | ✅ |
-| 5 | Tableau exports, dashboard, findings, dbt docs | Public dashboard link + findings in this README | ⬜ |
 
 ---
 
